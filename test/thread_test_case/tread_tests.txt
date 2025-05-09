@@ -1,0 +1,585 @@
+
+#include "u_sys/thread.h"
+#include "u_sys/utils.h"
+
+
+class arg
+{
+private:
+public:
+    arg() {
+        std::cout << "arg::constructor\n"; 
+    }
+    arg (const arg&) {
+        std::cout << "arg::copy\n"; 
+    }
+    arg (arg&&) {
+        std::cout << "arg::move\n"; 
+    }
+
+    arg& operator =(const arg&){
+        std::cout << "arg::copy_as\n"; 
+        return *this;
+    }
+
+    arg& operator =(arg&&){
+        std::cout << "arg::move_as\n"; 
+        return *this;
+    }
+
+    void proc()
+    {
+        std::cout << "arg::processing\n";
+    }
+
+    void task(ufo::token_t){
+
+    }
+
+    ~arg() {
+        std::cout << "arg::destructor\n"; 
+    }
+};
+
+inline void Task(arg&& arg, ufo::token_t token) {
+    std::cout << "123\n";
+    arg.proc();
+    uint16_t cnt = 0;
+    if (token)
+    {
+        std::cout << "token token\n";
+    }
+    
+    while (token)
+    {
+        if (!token)
+        {
+            std::cout << "!token\n";
+        }
+        if (cnt == 5)
+        {
+            break;
+        }
+        
+        std::cout << "cnt:" << ++cnt << '\n';
+        ufo::utl::sleep_for(1000);
+        if (token)
+        {
+            std::cout << "token token\n";
+        }
+    }
+}
+
+
+
+class sys : public ufo::thread
+{
+private:
+    
+public:
+    sys(/* args */) {}
+    ~sys() {}
+};
+
+
+extern "C" 
+void app_main() {
+
+
+    
+    // ufo::thread thread_t1; // passed
+
+    {
+        // test case:   1
+        //      thread with .join() when in it will be destruct
+        // it is normal usage of ufo::thread
+        // expect: 
+        //      1) construction 
+        //      2) create Task() 
+        //          arg and token move
+        //      3) counting from 1 to 10 
+        //          the parent-task (app_main) waits for the Task to complite 
+        //      4) joining thread
+        //      5) thread destruction
+        // test state:    
+        //      passed
+        ufo::thread thread_test_case_1(Task, arg());
+        std::cout << "\tjoinable ?: ";
+        if (thread_test_case_1.joinable())
+        {
+            std::cout << "yes\n";
+        }
+        else
+            std::cout << "nay\n";
+
+        thread_test_case_1.join();
+    }
+
+    {
+        std::cout << "test_case_2\n";
+        // test case:   2
+        //      thread without .join() when in it will be destruct
+        // expect: 
+        //      critical error
+        // test state:    
+        //      passed
+        ufo::thread thread_test_case_2 (Task, arg());
+    }
+
+    {
+        std::cout << "test_case_3\n";
+        // test case:   3
+        //      detaching thread
+        // expect:
+        //      .joinable() return "nay"
+        //      Task should be terminated after counting from 1 to n
+        //      second .detach() should throw critical error (or warning)
+        // test state:    
+        //      passed
+        ufo::thread thread_test_case_3(Task, arg());
+        
+        thread_test_case_3.detach();
+        std::cout << "task detached\n";
+
+        std::cout << "\tjoinable ?: ";
+        if (thread_test_case_3.joinable())
+        {
+            std::cout << "yes\n";
+        }
+        else
+            std::cout << "nay\n";
+        thread_test_case_3.detach();
+
+        std::cout << "try to join\n\t";
+        thread_test_case_3.join();
+    }
+
+
+
+    std::cout << "test_case_4\n";
+    // test case:   4
+    //      try to join, detach and terminate null-thread
+    // expect:
+    //      critical error: cant X-operate null-thread
+    // test state:    
+    //      passed
+    {
+        ufo::thread tread_test_case_4;
+        tread_test_case_4.join();
+        tread_test_case_4.detach();
+        tread_test_case_4.terminate();
+    }
+
+    std::cout << "test_case_5\n";
+
+    // test case:   5
+    //      sys is derived class of thread
+    //      (sys not implemented there is only inheritance)
+    // expect:
+    //      critical error: cant X-operate null-thread
+    // test state:    
+    //      passed
+    {
+        sys s;
+    }
+
+
+    {
+        std::cout << "test_case_6\n";
+        // test case:   6
+        //      terminating from parent-thread
+        // expect:
+        //      terminating
+        //      and just out from join
+        // test state:    
+        //      passed
+        ufo::thread thread_test_case_6(Task, arg());
+        ufo::utl::sleep_for(500);
+        thread_test_case_6.terminate();
+        thread_test_case_6.join();
+    }
+
+    // with wrapped-functions also work 
+
+    // [WARNING] finally it is wrong way (second creationt should be unpossible)
+    std::cout << "test_case_7\n";
+    // test case:   7
+    //      - create-then-create
+    //      - create-join-then-create
+    //      - create-terminate-then-create
+    //      - create-detach-then-create
+    // expect:
+    //      - create-then-create
+    //          first create - OK, next - CEr 
+    //      - create-join-then-create
+    //          [WARNING! for this test create function was marked as public]
+    //          create, join - OK, create after join - OK
+    //          | Due to create-function you can create thread(task) 
+    //          | as many times as you want but only in case when 
+    //          | thread was joined.
+    //          | In normal case, (create-function is protected and 
+    //          | can be called only in derived class, not in global area)
+    //          | it works like std::thread
+    //      - create-terminate-then-create
+    //          [WARNING! for this test create function was marked as public]
+    //          result: like in create-join-then-create
+    //      - create-detach-then-create
+    //          [WARNING! for this test create function was marked as public]
+    //          strong CEr
+    // test state:    
+    //      - create-then-create            - passed    - it is correct!!!
+    //      - create-join-then-create       - passed    - it is INcorrect!
+    //      - create-terminate-then-create  - passed    - it is INcorrect!
+    //      - create-detach-then-create     - passed    - it is correct!!!
+    {
+
+
+        // - create-then-create
+        // passed
+        // {
+        //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+        //     //  first creation
+        //     ufo::thread thread_test_case_7(Task, arg());
+        //     if (_err)
+        //     {
+        //         _err.Trace();
+        //         thread_test_case_7.join();
+        //         return;
+        //     }
+
+        //     thread_test_case_7.create(Task, arg());
+        //     if (_err)
+        //     {
+        //         _err.Trace();
+        //         thread_test_case_7.join();
+        //         return;
+        //     }
+        //     thread_test_case_7.join();
+        //     _err.Trace();
+        // }
+
+        // - create-join-then-create
+        // passed
+        // {
+        //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+        //     //  first creation
+        //     ufo::thread thread_test_case_7(Task, arg());
+        //     thread_test_case_7.join();
+        //     thread_test_case_7.create(Task, arg());
+        //     if (_err)
+        //     {
+        //         _err.Trace();
+        //         thread_test_case_7.join();
+        //         return;
+        //     }
+        //     thread_test_case_7.join();
+        // }
+
+        // - create-terminate-then-create
+        // passed
+        // {
+        //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+        //     //  first creation
+        //     ufo::thread thread_test_case_7(Task, arg());
+
+        //     ufo::utl::sleep_for(1000);      // for clear logs
+
+        //     thread_test_case_7.terminate();
+        //     ufo::utl::sleep_for(1000);
+        //     std::cout << "starting again\n";
+        //     thread_test_case_7.create(Task, arg());
+        //     if (_err)
+        //     {
+        //         _err.Trace();
+        //         thread_test_case_7.join();
+        //         return;
+        //     }
+        //     thread_test_case_7.join();
+        // }
+
+
+        // - create-detach-then-create
+        // passed
+        // {
+        //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+        //     //  first creation
+        //     ufo::thread thread_test_case_7(Task, arg());
+
+        //     ufo::utl::sleep_for(1000);      // for clear logs
+
+        //     thread_test_case_7.detach();
+        //     ufo::utl::sleep_for(1000);
+        //     std::cout << "starting again\n";
+        //     thread_test_case_7.create(Task, arg());
+        //     if (_err)
+        //     {
+        //         _err.Trace();
+        //         return;
+        //     }
+        // }
+        
+
+        
+    // test case:   8-14
+    //      - create-end-create
+    //      - create-end-join
+    //      - create-join-create
+    //      - create-join-join
+    //      - create-detach-join
+    //      - create-detach-detach
+    //      - create-detach-create
+    // expect:
+    //      CEr in all cases
+    // test state:    
+    //      passed
+    
+    // std::cout << "test_case_8 (create-end-create)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     // thread_test_case_8.join();
+    //     // thread_test_case_8.create(Task, arg());
+    //     // thread_test_case_8.join();
+    //     ufo::utl::sleep_for(7000);
+
+    //     std::cout << "second creation\n";
+    //     thread_test_case_8.create(Task, arg());
+    //     if (_err)
+    //     {
+    //         thread_test_case_8.join();
+    //     }
+    //     // ufo::utl::sleep_for(3000);
+    //     thread_test_case_8.join();
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+    // std::cout << "test_case_9 (create-join-create)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+
+    //     thread_test_case_8.join();
+    //     thread_test_case_8.create(Task, arg());
+    //     thread_test_case_8.join();
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+
+
+    // std::cout << "test_case_10 (create-join-join)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     thread_test_case_8.join();
+    //     thread_test_case_8.join();
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+    // std::cout << "test_case_11 (create-end-join)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     ufo::utl::sleep_for(7000);
+
+    //     thread_test_case_8.join();
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+
+    // std::cout << "test_case_12 (create-detach-join)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     thread_test_case_8.detach();
+    //     thread_test_case_8.join();
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+    
+    std::cout << "test_case_13 (create-detach-detach)\n";
+    {
+        ufo::Error_t &_err = ufo::Error_t::GetInstance();
+        //  first creation
+        ufo::thread thread_test_case_8(Task, arg());
+        thread_test_case_8.detach();
+        thread_test_case_8.detach();
+
+        _err.Trace();
+        _err.ClearAll();
+        _err.ForceClearCritical();
+    } 
+
+    std::cout << "test_case_14 (create-detach-create)\n";
+    {
+        ufo::Error_t &_err = ufo::Error_t::GetInstance();
+
+        ufo::thread thread_test_case_8(Task, arg());
+        thread_test_case_8.detach();
+        thread_test_case_8.create(Task, arg());
+
+        _err.Trace();
+        _err.ClearAll();
+        _err.ForceClearCritical();
+    } 
+
+
+    
+    // - id
+    //     passed
+    {
+        ufo::thread thread_test_case(Task, arg());
+        thread_test_case.join();
+    }
+    {
+        ufo::thread thread_test_case(Task, arg());
+        thread_test_case.join();
+    }
+
+
+
+    }
+
+
+// test case:   8-14
+    //      - create-end-create
+    //      - create-end-join
+    //      - create-join-create
+    //      - create-join-join
+    //      - create-detach-join
+    //      - create-detach-detach
+    //      - create-detach-create
+    // expect:
+    //      CEr in all cases
+    // test state:    
+    //      passed
+    
+
+    // now it is unpossible!!!
+    // std::cout << "test_case_8 (create-end-create)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     // thread_test_case_8.join();
+    //     // thread_test_case_8.create(Task, arg());
+    //     // thread_test_case_8.join();
+    //     ufo::utl::sleep_for(7000);
+
+    //     std::cout << "second creation\n";
+    //     thread_test_case_8.create(Task, arg());
+    //     if (_err)
+    //     {
+    //         thread_test_case_8.join();
+    //     }
+    //     // ufo::utl::sleep_for(3000);
+    //     thread_test_case_8.join();
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+
+    // now it is unpossible!!!
+    // std::cout << "test_case_9 (create-join-create)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+
+    //     thread_test_case_8.join();
+    //     thread_test_case_8.create(Task, arg());
+    //     thread_test_case_8.join();
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+
+ // now it is unpossible!!!
+    // std::cout << "test_case_14 (create-detach-create)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     thread_test_case_8.detach();
+    //     thread_test_case_8.create(Task, arg());
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // } 
+
+
+    // std::cout << "test_case_10 (create-join-join)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     thread_test_case_8.join();
+    //     thread_test_case_8.join();
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+    // std::cout << "sleep bt task start\n";
+    // ufo::utl::sleep_for(8000);
+    // std::cout << "sleep bt task end\n";
+
+
+    // std::cout << "test_case_11 (create-end-join)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     ufo::utl::sleep_for(8000);
+
+    //     thread_test_case_8.join();
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+    // std::cout << "sleep bt task start\n";
+    // ufo::utl::sleep_for(8000);
+    // std::cout << "sleep bt task end\n";
+
+    // std::cout << "test_case_12 (create-detach-join)\n";
+    // {
+    //     ufo::Error_t &_err = ufo::Error_t::GetInstance();
+    //     //  first creation
+    //     ufo::thread thread_test_case_8(Task, arg());
+    //     thread_test_case_8.detach();
+    //     thread_test_case_8.join();
+
+    //     _err.Trace();
+    //     _err.ClearAll();
+    //     _err.ForceClearCritical();
+    // }
+
+
+
+
+
+}

@@ -1,0 +1,16 @@
+			printf("\nenable ap:\n");
+			wf_details::wfap_t wifi_ap;
+			wifi_ap.enable();
+			printf("create ap:\n");
+			wifi_ap.create("u_esp32","12345678");
+
+			utl::sleep_for(1000);
+			wifi_ap.disable();
+			
+			utl::sleep_for(1000);
+			wifi_ap.enable();
+			wifi_ap.create("u_esp32","12345678");
+			utl::sleep_for(5000);
+			wifi_ap.ip_config(esp_interface_t::ESP_IF_WIFI_AP, ip_t(192, 168, 2, 1),ip_t(192, 168, 2, 1), ip_t(255, 255, 255, 0));
+			printf("af ip-cfg:\n");
+			wifi_ap.get_ip(esp_interface_t::ESP_IF_WIFI_AP).log();

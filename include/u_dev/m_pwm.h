@@ -1,0 +1,172 @@
+#pragma once
+
+#include "u_drivers/pwm/UFO_ESC.h"
+#include "u_sys/gpio.h"
+#include "u_sys/utils.h"
+#include "u_sys/error.h"
+#include "u_sys/trace.h"
+
+
+class mpwm_t
+{
+public:
+    static constexpr gpio_num_t mot_left = gpio_num_t::GPIO_NUM_14;
+    static constexpr gpio_num_t mot_right = gpio_num_t::GPIO_NUM_27;
+    
+    static constexpr gpio_num_t mot_right_ctrl_pin1 =gpio_num_t::GPIO_NUM_33; 
+    static constexpr gpio_num_t mot_right_ctrl_pin2 =gpio_num_t::GPIO_NUM_32; 
+    static constexpr gpio_num_t mot_left_ctrl_pin1 = gpio_num_t::GPIO_NUM_26;
+    static constexpr gpio_num_t mot_left_ctrl_pin2 = gpio_num_t::GPIO_NUM_25;
+    
+    
+    static constexpr float throt_threshhold = 0.2f;
+    static constexpr float rot_threshhold = 0.2f;
+    static constexpr float rot_force = 0.5f;
+
+public:
+    using motor_t = ufo::drv::UFO_ESC_driver;
+
+private:
+    motor_t _ml;
+    motor_t _mr;
+
+    float
+        ll_out = 0.f,
+        rr_out = 0.f;
+
+public:
+
+    mpwm_t()
+    {
+        _ml.Setup(0, mot_left);
+        _mr.Setup(1, mot_right);
+
+        ufo::utl::gpio_config(mot_right_ctrl_pin1, gpio_mode_t::GPIO_MODE_OUTPUT);
+        ufo::utl::gpio_config(mot_right_ctrl_pin2, gpio_mode_t::GPIO_MODE_OUTPUT);
+        ufo::utl::gpio_config(mot_left_ctrl_pin1, gpio_mode_t::GPIO_MODE_OUTPUT);
+        ufo::utl::gpio_config(mot_left_ctrl_pin2, gpio_mode_t::GPIO_MODE_OUTPUT);
+
+        gpio_set_level(mot_right_ctrl_pin1, 0);
+        gpio_set_level(mot_right_ctrl_pin2, 0);
+        gpio_set_level(mot_left_ctrl_pin1, 0);
+        gpio_set_level(mot_left_ctrl_pin2, 0);
+    }
+    ~mpwm_t() {}
+
+    void target_write(float m1, float m2){
+        left_front();
+        right_front();
+        _ml.Write(ufo::utl::map(m1, -1.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
+        _mr.Write(ufo::utl::map(m2, -1.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
+    }
+
+    float get_mot_throt_l() {
+        return ll_out;
+    }
+    float get_mot_throt_r() {
+        return rr_out;
+    }
+
+
+    void update(float t, float r)
+    {
+        // t := [-1.f, 1.f];
+        // r := [-1.f, 1.f]
+
+        ll_out = 0.f;
+        rr_out = 0.f;
+        
+        uint16_t
+            l_out = 0,
+            r_out = 0;
+
+        if (abs(t) > throt_threshhold)  // t
+        {
+            ll_out = t;
+            rr_out = t;
+            if (abs(r) > rot_threshhold)    // +- r
+            {   
+                ll_out += r * rot_force;
+                rr_out -= r * rot_force;
+            }
+            if (t > 0.f)
+            {
+                left_front();
+                right_front();
+            }
+            else {
+                left_back();
+                right_back();
+            }
+        }
+        else {
+
+            if (abs(r) > rot_threshhold)    // t = r
+            {   
+                ll_out = r * rot_force;
+                rr_out = r * rot_force;
+
+                if (r > 0)
+                {
+                    left_front();
+                    right_back();
+                }
+                else {
+                    left_back();
+                    right_front();
+                }
+            }
+            else {
+                _ml.Write(0);
+                _mr.Write(0); 
+                printf("mt:\n\t r:%.3f, l:%.3f\n", ll_out, rr_out);               
+                return;
+            }
+        }
+        
+        ll_out = ufo::utl::constrain(abs(ll_out), 0.f, 1.f);
+        rr_out = ufo::utl::constrain(abs(rr_out), 0.f, 1.f);
+        printf("mt:\n\t r:%.3f, l:%.3f\n", ll_out, rr_out);               
+        
+        l_out = ufo::utl::map(ll_out, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out));
+        r_out = ufo::utl::map(rr_out, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out));
+        
+        _ml.Write(l_out);
+        _mr.Write(r_out);
+    }
+
+private:
+    void left_front()
+    {
+        gpio_set_level(mot_right_ctrl_pin1, 1);
+        gpio_set_level(mot_right_ctrl_pin2, 0);
+    }
+
+    void left_back()
+    {
+        gpio_set_level(mot_right_ctrl_pin1, 0);
+        gpio_set_level(mot_right_ctrl_pin2, 1);
+    }
+
+    void right_front()
+    {
+        gpio_set_level(mot_left_ctrl_pin1, 1);
+        gpio_set_level(mot_left_ctrl_pin2, 0);
+    }
+
+    void right_back()
+    {
+        gpio_set_level(mot_left_ctrl_pin1, 0);
+        gpio_set_level(mot_left_ctrl_pin2, 1);
+    }
+
+    void right_off(){
+        gpio_set_level(mot_left_ctrl_pin1, 0);
+        gpio_set_level(mot_left_ctrl_pin2, 0);
+    }
+
+    void left_off(){
+        gpio_set_level(mot_right_ctrl_pin1, 0);
+        gpio_set_level(mot_right_ctrl_pin2, 0);
+    }
+};

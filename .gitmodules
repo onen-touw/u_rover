@@ -1,0 +1,6 @@
+[submodule "include/u_sys"]
+	path = include/u_sys
+	url = https://github.com/onen-touw/u_system.git
+[submodule "include/u_drivers"]
+	path = include/u_drivers
+	url = https://github.com/onen-touw/u_drivers.git

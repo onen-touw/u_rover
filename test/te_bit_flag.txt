@@ -1,0 +1,130 @@
+#include <iostream>
+#include <stdint.h>
+#include "u_sys/btflg.h"
+
+enum class flag_pos_t
+{
+    driver_inited           = 0,
+    event_inited            = 1,
+    driver_started          = 2,
+    enabled                 = 3,
+    static_buf              = 4,
+    static_ip               = 5,
+    long_rng                = 6,
+    persistent              = 7,
+};
+int main()
+{
+    using namespace ufo;
+    bit_flag_t<uint8_t> ff(0b0);
+    std::cout << "ctor\n";
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+    
+    std::cout << "\nmulti_set\n";
+    ff.set(1, 0, 4);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+
+    std::cout << "\nrst\n";
+    ff.rst();
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+
+    std::cout << "\nmulti_set enums\n";
+    ff.set(flag_pos_t::driver_inited, flag_pos_t::event_inited, flag_pos_t::static_ip);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+    
+    std::cout << "\nget_one\n";
+    std::cout << ff.get(flag_pos_t::driver_inited) << '\n';
+
+    std::cout << "\nget_multy (should be true)\n";
+    std::cout << ff.get(flag_pos_t::driver_inited, flag_pos_t::event_inited, flag_pos_t::static_ip) << '\n';
+
+
+    std::cout << "\nget_multy (should be false)\n";
+    std::cout << ff.get(flag_pos_t::driver_inited, flag_pos_t::event_inited, flag_pos_t::static_ip, flag_pos_t::static_buf) << '\n';
+
+
+    std::cout << "\nset_one\n";
+    ff.set(flag_pos_t::driver_started);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+    
+
+    std::cout << "\nmulti_unset\n";
+    ff.unset(1, 0, 4);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+
+    std::cout << "\nmulti_unset again\n";
+    ff.unset(1, 0, 4);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+
+    std::cout << "\nunset_one\n";
+    ff.unset(flag_pos_t::driver_started);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+
+    std::cout << "\ntogle_multy\n";
+    ff.togle(1, 0, 4);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+    
+    std::cout << "\ntogle_multy again\n";
+    ff.togle(1, 0, 4);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+
+    std::cout << "\ntogle_one\n";
+    ff.togle(flag_pos_t::driver_started);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+    
+    std::cout << "\ntogle_one again\n";
+    ff.togle(flag_pos_t::driver_started);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+    
+    std::cout << "\nrst\n";
+    ff.rst();
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+
+    std::cout << "\nudp\n";
+    ff.upd(0b10001011);
+    for (int i = 7; i >= 0; i--)
+    {
+        std::cout << ff.get(i) << ' ';
+    }
+    std::cout << "\n";
+    return 0;
+}

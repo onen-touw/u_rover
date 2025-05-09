@@ -1,0 +1,40 @@
+			wf_details:: wfsta_t wifi_sta;
+			wifi_sta.enable();
+			printf("\ncheck first connection:\n");
+			wifi_sta.connect("u_esp32","12345678");
+			wifi_sta.ip_config(esp_interface_t::ESP_IF_WIFI_STA,"192.168.0.64", "192.168.0.1","255.255.255.0");
+			
+			utl::sleep_for(3000);
+
+			printf("\ncheck disconnection:\n");
+			wifi_sta.disconnect();
+
+			utl::sleep_for(3000);
+
+			printf("\ncheck second connection:\n");
+			wifi_sta.connect();
+
+			utl::sleep_for(3000);
+			printf("\ncheck disabling:\n");
+			wifi_sta.disconnect();
+			utl::sleep_for(2000);
+			printf("disabling:\n");
+			wifi_sta.disable();
+
+			utl::sleep_for(5000);
+
+			printf("\ncheck second enabling:\n");
+			if (!wifi_sta.enable()){
+				printf("\t !en\n");
+			}
+
+			printf("\ncheck conn af-enabling:\n");
+			if (!wifi_sta.connect("u_esp32","12345678")){
+				printf("\t !conn\n");
+			}
+			utl::sleep_for(3000);
+			printf("\ncheck disabling:\n");
+			wifi_sta.disconnect();
+			utl::sleep_for(2000);
+			printf("disabling:\n");
+			wifi_sta.disable();
