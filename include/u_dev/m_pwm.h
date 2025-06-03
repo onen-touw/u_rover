@@ -42,8 +42,8 @@ public:
 
     mpwm_t()
     {
-        _ml.Setup(0, mot_left);
-        _mr.Setup(1, mot_right);
+        _ml.setup(0, mot_left);
+        _mr.setup(1, mot_right);
 
         ufo::utl::gpio_config(mot_right_ctrl_pin1, gpio_mode_t::GPIO_MODE_OUTPUT);
         ufo::utl::gpio_config(mot_right_ctrl_pin2, gpio_mode_t::GPIO_MODE_OUTPUT);
@@ -60,8 +60,8 @@ public:
     void target_write(float m1, float m2){
         left_front();
         right_front();
-        _ml.Write(ufo::utl::map(m1, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
-        _mr.Write(ufo::utl::map(m2, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
+        _ml.write(ufo::utl::map(m1, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
+        _mr.write(ufo::utl::map(m2, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
     }
 
     float get_mot_throt_l() const
@@ -138,8 +138,8 @@ public:
 
                 right_front();
                 left_front();
-                _ml.Write(0);
-                _mr.Write(0); 
+                _ml.write(0);
+                _mr.write(0); 
                 // printf("0 mt:\n\t r:%.3f, l:%.3f\n", ll_out, rr_out);               
                 return;
             }
@@ -154,8 +154,8 @@ public:
         
         // printf("mt:\n\t r:%.3f, l:%.3f\nrp: %d, lp: %d", ll_out, rr_out, l_out, r_out);               
 
-        _ml.Write(l_out);
-        _mr.Write(r_out);
+        _ml.write(l_out);
+        _mr.write(r_out);
     }
 
 private:

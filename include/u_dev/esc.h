@@ -18,7 +18,7 @@ public:
     static constexpr gpio_num_t gpio_bot_l = gpio_num_t::GPIO_NUM_14;
     static constexpr gpio_num_t gpio_bot_r = gpio_num_t::GPIO_NUM_13;
     
-    static constexpr float kpit = 0.05f;
+    static constexpr float kpit = 0.05f;    // additive coeffs
     static constexpr float krol = 0.05f;
     static constexpr float kyaw = 0.05f;
 
@@ -35,20 +35,20 @@ private:
 
 public:
     esc_quad_t() {
-        _r1.Setup(0, gpio_top_r);
-        _r2.Setup(1, gpio_bot_r);
-        _r3.Setup(2, gpio_bot_l);
-        _r4.Setup(3, gpio_top_l);
+        _r1.setup(0, gpio_top_r);
+        _r2.setup(1, gpio_bot_r);
+        _r3.setup(2, gpio_bot_l);
+        _r4.setup(3, gpio_top_l);
 
         set_min();
     }
     ~esc_quad_t() {}
 
     void set_min(){
-        _r1.Write(motor_t::esc_min_out);
-        _r2.Write(motor_t::esc_min_out);
-        _r3.Write(motor_t::esc_min_out);
-        _r4.Write(motor_t::esc_min_out);
+        _r1.write(motor_t::esc_min_out);
+        _r2.write(motor_t::esc_min_out);
+        _r3.write(motor_t::esc_min_out);
+        _r4.write(motor_t::esc_min_out);
     }
 
     void arm(){
@@ -57,10 +57,10 @@ public:
             printf("arm\n");
             _arm = true;
             uint16_t val = _arm_per * (motor_t::esc_max_out - motor_t::esc_min_out)+ motor_t::esc_min_out;
-            _r1.Write(val);
-            _r2.Write(val);
-            _r3.Write(val);
-            _r4.Write(val);
+            _r1.write(val);
+            _r2.write(val);
+            _r3.write(val);
+            _r4.write(val);
         }
     }
 
@@ -70,10 +70,10 @@ public:
 
     void disarm(){
         _arm = false;
-        _r1.Write(motor_t::esc_min_out);
-        _r2.Write(motor_t::esc_min_out);
-        _r3.Write(motor_t::esc_min_out);
-        _r4.Write(motor_t::esc_min_out);
+        _r1.write(motor_t::esc_min_out);
+        _r2.write(motor_t::esc_min_out);
+        _r3.write(motor_t::esc_min_out);
+        _r4.write(motor_t::esc_min_out);
         printf("disarm\n");
     }
 
@@ -82,10 +82,10 @@ public:
         {
             return;
         }
-        _r1.Write(ufo::utl::map(m1, mot_min, mot_max, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out)));
-        _r2.Write(ufo::utl::map(m2, mot_min, mot_max, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out)));
-        _r3.Write(ufo::utl::map(m3, mot_min, mot_max, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out)));
-        _r4.Write(ufo::utl::map(m4, mot_min, mot_max, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out)));
+        _r1.write(ufo::utl::map(m1, mot_min, mot_max, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out)));
+        _r2.write(ufo::utl::map(m2, mot_min, mot_max, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out)));
+        _r3.write(ufo::utl::map(m3, mot_min, mot_max, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out)));
+        _r4.write(ufo::utl::map(m4, mot_min, mot_max, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out)));
         printf(">r1:%u, r2:%u, r3:%u, r4: %u\n", _r1.GetDuty(), _r2.GetDuty(), _r3.GetDuty(), _r4.GetDuty());
     }
 
@@ -111,10 +111,10 @@ public:
         int16_t rr3 = ufo::utl::constrain(r1, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out));
         int16_t rr4 = ufo::utl::constrain(r1, static_cast<float>(motor_t::esc_min_out), static_cast<float>(motor_t::esc_max_out));
 
-        _r1.Write(rr1);
-        _r2.Write(rr2);
-        _r3.Write(rr3);
-        _r4.Write(rr4);
+        _r1.write(rr1);
+        _r2.write(rr2);
+        _r3.write(rr3);
+        _r4.write(rr4);
         
         printf(">r1:%.3f, r2:%.3f, r3:%.3f, r4: %.3f\n", r1, r2, r3, r4);
         printf(">r1:%d, r2:%d, r3:%d, r4: %d\n", rr1, rr2, rr3, rr4);
