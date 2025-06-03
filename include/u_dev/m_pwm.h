@@ -19,9 +19,10 @@ public:
     static constexpr gpio_num_t mot_left_ctrl_pin2 = gpio_num_t::GPIO_NUM_25;
     
     
-    static constexpr float throt_threshhold = 0.2f;
-    static constexpr float rot_threshhold = 0.2f;
+    static constexpr float throt_threshhold = 0.3f;
+    static constexpr float rot_threshhold = 0.3f;
     static constexpr float rot_force = 0.5f;
+    static constexpr float rotride_force = 0.9f;
 
 public:
     using motor_t = ufo::drv::UFO_ESC_driver;
@@ -33,6 +34,9 @@ private:
     float
         ll_out = 0.f,
         rr_out = 0.f;
+    uint16_t
+            l_out = 0,
+            r_out = 0;
 
 public:
 
@@ -56,29 +60,40 @@ public:
     void target_write(float m1, float m2){
         left_front();
         right_front();
-        _ml.Write(ufo::utl::map(m1, -1.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
-        _mr.Write(ufo::utl::map(m2, -1.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
+        _ml.Write(ufo::utl::map(m1, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
+        _mr.Write(ufo::utl::map(m2, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out)));
     }
 
-    float get_mot_throt_l() {
+    float get_mot_throt_l() const
+    {
         return ll_out;
     }
-    float get_mot_throt_r() {
+    float get_mot_throt_r() const 
+    {
         return rr_out;
     }
 
+    uint16_t get_rpwm() const 
+    {
+        return r_out;
+    }
+    uint16_t get_lpwm() const
+    {
+        return l_out;
+    }
 
     void update(float t, float r)
     {
         // t := [-1.f, 1.f];
         // r := [-1.f, 1.f]
+        // printf("in:\n\t tt:%.3f, rr:%.3f\n", t, r);               
+
 
         ll_out = 0.f;
         rr_out = 0.f;
         
-        uint16_t
-            l_out = 0,
-            r_out = 0;
+        l_out = 0;
+        r_out = 0;
 
         if (abs(t) > throt_threshhold)  // t
         {
@@ -86,8 +101,10 @@ public:
             rr_out = t;
             if (abs(r) > rot_threshhold)    // +- r
             {   
-                ll_out += r * rot_force;
-                rr_out -= r * rot_force;
+                // printf("ride-rot\n");
+
+                ll_out += r * rotride_force;
+                rr_out -= r * rotride_force;
             }
             if (t > 0.f)
             {
@@ -103,6 +120,7 @@ public:
 
             if (abs(r) > rot_threshhold)    // t = r
             {   
+                // printf("rotrot\n");
                 ll_out = r * rot_force;
                 rr_out = r * rot_force;
 
@@ -117,20 +135,25 @@ public:
                 }
             }
             else {
+
+                right_front();
+                left_front();
                 _ml.Write(0);
                 _mr.Write(0); 
-                printf("mt:\n\t r:%.3f, l:%.3f\n", ll_out, rr_out);               
+                // printf("0 mt:\n\t r:%.3f, l:%.3f\n", ll_out, rr_out);               
                 return;
             }
         }
         
-        ll_out = ufo::utl::constrain(abs(ll_out), 0.f, 1.f);
-        rr_out = ufo::utl::constrain(abs(rr_out), 0.f, 1.f);
-        printf("mt:\n\t r:%.3f, l:%.3f\n", ll_out, rr_out);               
+        ll_out = ufo::utl::constrain(abs(ll_out), throt_threshhold, 1.f);
+        rr_out = ufo::utl::constrain(abs(rr_out), throt_threshhold, 1.f);
+        // printf("mt:\n\t r:%.3f, l:%.3f\n", ll_out, rr_out);               
         
-        l_out = ufo::utl::map(ll_out, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out));
-        r_out = ufo::utl::map(rr_out, 0.f, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out));
+        l_out = ufo::utl::map(ll_out, throt_threshhold, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out));
+        r_out = ufo::utl::map(rr_out, throt_threshhold, 1.f, 0.f, static_cast<float>(motor_t::pwm_max_out));
         
+        // printf("mt:\n\t r:%.3f, l:%.3f\nrp: %d, lp: %d", ll_out, rr_out, l_out, r_out);               
+
         _ml.Write(l_out);
         _mr.Write(r_out);
     }
