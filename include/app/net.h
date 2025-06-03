@@ -7,35 +7,117 @@
 #include <tuple>
 #include <bits/shared_ptr.h>
 
+#include "u_dev/lora/UFO_Lora.h"
+
 enum class net_descriptors_t {
     sock_main,
-    sock_,
-    lora_,
+    sock_1,
+    lora,
 };
 
-class net_t
+class nettt_t
 {
-    using sock_t = ufo::net::fast_sock;    
-    using lora_t = nullptr_t;   // not implemented
-    
-    using base_t = ufo::net::fast_sock;
-    using item_t = std::unique_ptr<base_t>;
-
-    using s_pair_t = std::pair<net_descriptors_t, item_t>;
-    using lst_t = ufo::list_t<s_pair_t>;
-    using iter_t = lst_t::simple_iterator_t;
-    using block_t = ufo::net::uSocketControlBlock_t;
 public:
-    using msg_block_t = std::shared_ptr<block_t>;
+    using sock_t = ufo::net::fsk;    
+    using lora_t = dev::lora_t;
+    using desc_t = uint16_t;
+    using msg_block_t = std::shared_ptr<ufo::net::uSocketControlBlock_t>;
+    
 private:
-    lst_t _net_interfaces;
+    class ts_t;
+
+    using base_t = ufo::net::fsk_base;
+    using tlst_t = ufo::list_t<ts_t>;
+    using titer_t = tlst_t::simple_iterator_t;
+
+private:
+    // lst_t _net_interfaces;
+    tlst_t _threads;
+    static desc_t _d;
+public:
+    enum class behav_t {
+        wait,
+        kill,
+    };
+
+private:
+    class ts_t
+    {
+    private:
+        ufo::thread _t;
+        desc_t _d = 0;
+        behav_t _b = behav_t::kill;
+    public:
+        
+        template <typename... Args>
+        ts_t(desc_t d,  ufo::thread_cfg cfg, Args... args) : _t(cfg, std::forward<Args>(args)...), _d(d) {}
+
+        void set_b(behav_t b) { _b = b; }
+        desc_t get_d() const {return  _d;}
+
+        ~ts_t() {
+            printf("ts::d-tor\n");
+
+            if (_t.joinable())
+            {
+                if (_b == behav_t::kill)
+                {
+                    _t.terminate();
+                    return;
+                }
+                _t.join();
+            }
+        }
+    };
     
 public:
-    net_t() {}
-    
-    ~net_t() {}
+    explicit nettt_t(){} 
+    ~nettt_t(){
+        printf("~nett");
+    }
 
-    bool mk_sock(net_descriptors_t d, const char* addr, sock_t::sockt_t type, sock_t::callback_t cb, const char* src = nullptr){
+    // descriptor
+    msg_block_t mk(desc_t& d, std::unique_ptr<base_t> sock) {
+        if (!sock)
+        {
+            d = 0;
+            return msg_block_t();
+        }
+        
+        msg_block_t blk = sock->get_block();
+
+        ufo::thread_cfg cfg;
+        cfg._name = "net";
+        cfg._core = 0;
+        cfg._prio = 5;
+        cfg._stackSize = 4096;
+
+        _threads.emplace_back(++_d, cfg, task, std::move(sock));
+        d = _d;
+        return blk;
+    }
+
+    void rm(desc_t d, behav_t b = behav_t::wait) {
+        if (d > _d)
+        {
+            return;
+        }
+
+        _threads.pop_if(
+            d, 
+            [](const ts_t &obj, const desc_t desct)
+            {
+                if (obj.get_d() == desct)
+                {
+                    return true;
+                }
+                return false; 
+            });
+    }
+
+/* 
+    bool mk_sock(net_descriptors_t d, std::unique_ptr<base_t> sock)
+    {
         if (!_net_interfaces.empty())
         {
             for (iter_t it = _net_interfaces.begin(); it; ++it)
@@ -46,13 +128,7 @@ public:
                 }
             }
         }
-        item_t item = std::make_unique<sock_t>(addr, type, cb);
-
-        if (src)
-        {
-            item->set_source(src);
-        }
-        _net_interfaces.emplace_back(s_pair_t(d, std::move(item)));
+        _net_interfaces.emplace_back(d, std::move(sock));
         
         return true;
     }
@@ -68,7 +144,7 @@ public:
     }
 
     // if not found return empty shared_ptr
-    std::shared_ptr<block_t> get_block(net_descriptors_t d) {
+    msg_block_t get_block(net_descriptors_t d) {
 
         if (!_net_interfaces.empty())
         {
@@ -80,9 +156,8 @@ public:
                 }
             }
         }
-        return std::shared_ptr<block_t>();
+        return msg_block_t();
     }
-
 
     void task(ufo::token_t token){
 
@@ -100,5 +175,21 @@ public:
             ufo::utl::sleep_for(5);
         }
     }
-
+ */
+private:
+    static void task(std::unique_ptr<base_t> ptr, ufo::token_t token)
+    {
+        printf("task-in\n");
+        while (token)
+        {
+            ptr->snd();
+            ptr->rcv();
+            ptr->ch_snd();
+            ptr->ch_rcv();
+        }
+        printf("task-out\n");
+        
+    }
 };
+ 
+nettt_t::desc_t nettt_t::_d = 0;

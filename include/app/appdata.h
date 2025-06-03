@@ -7,11 +7,14 @@ namespace app
         class app_data_t
         {
         public:
-            types::remote_data_t _remote = {};
+            types::control_sig_t _control_sig = {};
             types::bar_data_t _baro = {};
             types::imu_data_t _imu = {};
             // types::mot_t _mot = {};
             types::rover_mot_t _rover = {};
+
+            types::event_t _event = {};
+            types::app_cmd_queue_t _queue = {};
 
         private:
             app_data_t(){}
