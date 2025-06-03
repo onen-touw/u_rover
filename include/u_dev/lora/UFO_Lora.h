@@ -7,6 +7,63 @@
 #include "u_drivers/uart/UFO_Uart.h"
 #include "u_sys/thread.h"
 
+namespace dev
+{
+
+    class lora_t : public lorall_t, public ufo::net::fsk_base
+    {
+    private:
+    public:
+        lora_t(ufo::drv::UFO_Uart *port, callback_t cb)
+            : lorall_t(port), fsk_base(cb)
+        {
+            printf("fsk::c-tor\n");
+        }
+        virtual ~lora_t() override {
+            printf("fsk::d-tor\n");
+        }
+
+        virtual void snd() override
+        {
+            {
+                ufo::lock_guard<ufo::mutex_t> _l(_snd->get_lock());
+
+                if (_snd->GetDataBlock()._ready)
+                {
+                    api_write(_snd->GetDataBlock()._payload, _snd->GetDataBlock()._len);
+                    _snd->GetDataBlock()._ready = false;
+                    _snd->GetDataBlock()._len = 0;
+
+                    // __AddTargetAddr(_snd->GetDataBlock()._payload);
+                    // _port->SendMsg((char*)_snd->GetDataBlock()._payload, _snd->GetDataBlock()._len);
+                    // _ctrlBlk._data._lastCallTick = ...
+                }
+            }
+            ufo::utl::sleep_for(25); // ??
+            wait_lora_done();        // for rcv and then wait
+                                     // (otherwise: rcv-data-from-lora then
+                                     // wait lora-done then copy-data-to-user)
+        }
+
+        virtual void rcv() override
+        {
+            uint16_t len = 0;
+            api_read(_rcv->_payload, len);
+            if (len)
+            {
+                _rcv->_len = len;
+                _callback(_rcv.get());
+            }
+            wait_lora_done(); // for rcv and then wait
+                              // (otherwise: rcv-data-from-lora then
+                              // wait lora-done then copy-data-to-user)
+        }
+        virtual void ch_snd() override {}
+        virtual void ch_rcv() override {}
+    };
+
+} // namespace dev
+
 class lora 
 {
 public:
@@ -22,8 +79,6 @@ private:
 
     std::shared_ptr<snd_t> _snd;
     std::unique_ptr<rcv_t> _rcv;
-
-
     callback_t _callback = nullptr;
 
 public:
@@ -47,9 +102,7 @@ public:
     }
 
     void SetChannel(uint8_t c){
-     
-        _conf._targAddr._chan = ufo::utl::constrain(c, uint8_t(0), uint8_t(83));
-        
+        _conf._targAddr._chan = ufo::utl::constrain(static_cast<int> (c), 0, 83);
     }
 
     const std::shared_ptr<snd_t> get_block() const
@@ -91,29 +144,29 @@ public:
         // }
         
         _conf.GenCfg();
-        ufo::Trace_t::log("lora:: gen cfg");
+        ufo::Trace_t::log("lora:: gen cfg\n");
 
         SetMode(LORA_MODE_CMD);
         ufo::utl::sleep_for(10);
-        ufo::Trace_t::log("lora:: set mode");
+        ufo::Trace_t::log("lora:: set mode\n");
         
         WriteCMD(_conf._cfg);
-        ufo::Trace_t::log("lora:: write cmd");
+        ufo::Trace_t::log("lora:: write cmd\n");
         ReadCMD();
-        ufo::Trace_t::log("lora:: read cmd");
+        ufo::Trace_t::log("lora:: read cmd\n");
 
         ufo::utl::sleep_for(40);
 
         char c[] = { READ_CONFIGURATION, 0, 8};
         WriteMSG(c, 3);
         ReadCMD();            //todo (parse and compare)
-        ufo::Trace_t::log("lora:: read cfg");
+        ufo::Trace_t::log("lora:: read cfg\n");
 
         SetMode(LORA_MODE_NORMAL);
         ufo::utl::sleep_for(40);
 
         // todo: check if 
-        ufo::Trace_t::log("lora:: Setup end");
+        ufo::Trace_t::log("lora:: Setup end\n");
     }
     
     void Iteration () {
@@ -206,15 +259,14 @@ private:
 
     void WriteMSG(char *msg, uint32_t size)
     {
-    {
-        ufo::lock_guard<ufo::mutex_t> _l(_snd->get_lock());
-        _port->SendMsg(msg, size);
+        {
+            ufo::lock_guard<ufo::mutex_t> _l(_snd->get_lock());
+            _port->SendMsg(msg, size);
+        }
+        // printf("==");
+        ufo::utl::sleep_for(20);
+        WaitAUX_True(500);
     }
-    printf("==");
-    ufo::utl::sleep_for(20);
-    WaitAUX_True(500);
-
-}
 
     void ReadMSG(){
         // int  i = Serial2.available();
@@ -228,13 +280,13 @@ private:
         // __FlushPort();
 
         memset(_rcv->_payload, 0,_rcv->_len);
-        if (_port->Available()>1)
+        if (_port->Available() > 1)
         {
             _rcv->_len = _port->Read(_rcv->_payload);
             _callback(_rcv.get());
         }
-        WaitAUX_True(1000);
-        __FlushPort();
+        WaitAUX_True(500);
+        _port->Flush();
     }
 
     void ReadCMD(){
@@ -243,15 +295,15 @@ private:
         {
             _port->Read(buf, 11);
         }
-        ufo::Trace_t::flog("recv: %s\n", buf);
+        // ufo::Trace_t::flog("recv: %s\n", buf);
         __FlushPort();
     }
 
     void __FlushPort(){
         char buf[100];
-        while (_port->Available() > 0)
+        while (_port->Available() > 1)
         {
-            _port->Read(buf);
+            _port->Read(buf, 100);
         }
     }
 
