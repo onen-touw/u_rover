@@ -19,7 +19,7 @@
 #include "net.h"
 #include "appdata.h"
 #include "u_dev/lora/UFO_Lora.h"
-
+#include "u_dev/bazz.h"
 namespace app
 {
     class app_t
@@ -145,6 +145,8 @@ namespace app
 					nettt_t::sock_t::sockt_t::server, 
 					net_callback)
 				);
+
+			bazz_t bz;
 				
 			mpwm_t motors;
 			crt::encrypte_t<remote_cmd_e> encripter;
@@ -181,7 +183,7 @@ namespace app
 						appd._rover._lpwm = motors.get_rpwm();
 					}
 
-					ufo::utl::sleep_for(5);
+					ufo::utl::sleep_for(10);
 
 
 					if (xQueueReceive(appd._queue._q, &cmd, 10))
@@ -262,8 +264,14 @@ namespace app
 				{
 					if (event._alarm.get() == app_event_alarm_e::disconn)
 					{
-						// bip-bip-bip
 						printf("rv::alarm::disconn\n");
+						for (size_t i = 0; i < 3; i++)
+						{
+							bz.update(524);
+							utl::sleep_for(25);
+							bz.update(0);
+							utl::sleep_for(15);
+						}
 						event._app.back();
 					}
 					else if (event._alarm.get() == app_event_alarm_e::find_mode)
@@ -272,36 +280,59 @@ namespace app
 
 						while (true)
 						{
+							printf(".");
+							for (size_t i = 0; i < 2; i++)
+							{
+								bz.update(0);
+								utl::sleep_for(25);
+								bz.update(524);
+								utl::sleep_for(15);
+							}
+							bz.update(0);
+
 							if (xQueueReceive(appd._queue._q, &cmd, 50))
 							{
 								if (cmd == qcmd_t::find_off)
 								{
 									printf("\n");
+									bz.update(0);
+									utl::sleep_for(15);
+									bz.update(0);
+									utl::sleep_for(15);
 
 									event._app.back();
 									break;
 								}
-								continue;
 							}
-							printf(".");
-							// bip-bip
-							utl::sleep_for(50);
 						}
 					}
 					else if (event._alarm.get() == app_event_alarm_e::warning){
-						// bp
 						printf("rv::alarm::warning\n");
+						// bp
+						// bip
+						bz.update(524);
+						utl::sleep_for(25);
+						bz.update(0);
+						
 						event._app.back();
 					}
 					else if (event._alarm.get() == app_event_alarm_e::battery)
 					{
-						// bip
 						printf("rv::alarm::bat low\n");
+						// bip
+						bz.update(524);
+						utl::sleep_for(50);
+						bz.update(0);
+						
 						event._app.back();
 					}
 					else if (event._alarm.get() == app_event_alarm_e::battery_crit)
 					{
 						//bip-bibiiiiip
+						bz.update(524);
+						utl::sleep_for(500);
+						bz.update(0);
+						
 						printf("rv::alarm::bat low\n\tpower-off\n");
 						break;
 					}
@@ -312,6 +343,10 @@ namespace app
 						{
 							// bip-bip-bibibip
 							printf("rv::alarm::critical\n");
+							//bip-bibiiiiip
+							bz.update(524);
+							utl::sleep_for(500);
+							bz.update(0);
 							ufo::utl::sleep_for(500);
 						}
 						break;

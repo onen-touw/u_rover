@@ -1,5 +1,7 @@
 #pragma once
-
+#include <stdint.h>
+#include "sdkconfig.h"
+#include "soc/gpio_num.h"
 // ===================== minimal requared ===================== 
 
 #define UFO_WIFI
@@ -12,3 +14,11 @@
 #define UFO_UART_CNT 2      // 3 max
 
 // ============================================================ 
+namespace app
+{
+    class appconfig
+    {
+    public:
+        static constexpr gpio_num_t gpio_buzz = gpio_num_t::GPIO_NUM_23; 
+    };
+}
