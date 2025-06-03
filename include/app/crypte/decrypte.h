@@ -1,12 +1,11 @@
 #pragma once
 
 #include "crtypes.h"
-#include "cmds.h"
 #include "crthelp.h"
 
 namespace crt {
 
-
+	template <typename cmd_t, std::enable_if_t<std::is_enum_v<cmd_t> && sizeof(cmd_t) == sizeof(char), bool> = true> 
 	class decrypte_t
 	{
 	public:
@@ -20,16 +19,17 @@ namespace crt {
 		~decrypte_t() {}
 
 		static void unpack(uint8_t* buf, uint8_t sz, handle_t handle) {
+	
 			if (sz < cfg::it_data)
 			{
-                // std::cout << "error\n";
-				ufo::Trace_t::log("inc sz error\n");
+				// ufo::Trace_t::log("inc sz error\n");
+				printf("inc sz error\n");
 				return;
 			}
 			if (sz != buf[cfg::it_sz])
 			{
-                // std::cout << "error: bad_packet\n";
-				ufo::Trace_t::log("error: bad_packet\n");
+				// ufo::Trace_t::log("error: bad_packet\n");
+				printf("error: bad_packet, len: %u %u\n", sz, buf[cfg::it_sz]);
 				return;
 			}
 
@@ -44,11 +44,12 @@ namespace crt {
 			if (q != crc)
 			{
 				// ufo::Trace_t::log("error: bad_crc\n");
-				printf("error: bad_crc\n");
+				printf("error: bad_crc %u\n", q);
 				return;
 			}
 			uint8_t cnt = buf[cfg::it_cnt];
-		
+			
+
 			// parse in
 			if (buf[cfg::it_in] == '>')
 			{
@@ -62,13 +63,13 @@ namespace crt {
 			}
 			else if (buf[cfg::it_in] == '!')
 			{
-                // std::cout << "error: !not implemented\n";
-				ufo::Trace_t::log("error: !not implemented\n");
+				// ufo::Trace_t::log("error: !not implemented\n");
+				printf("error: !not implemented\n");
 			}
 			else
 			{
-                // std::cout << "error: bad_packet\n";
-				ufo::Trace_t::log("error: bad_packet\n");
+				// ufo::Trace_t::log("error: bad_packet\n");
+				printf("error: bad_packet\n");
 			}
 		}
 
@@ -96,7 +97,7 @@ namespace crt {
 				return;
 			}
 
-			for (size_t i = cfg::it_data; i < sz - 1ull; i++)
+			for (size_t i = cfg::it_data; i < sz - 2ull; i++)
 			{
 				printf("\t%u\n", buf[i]);
 				// std::cout << "\t" << std::bitset<8>(_buf[i]) << '\n';
@@ -106,9 +107,8 @@ namespace crt {
 					printf("\n");
 				}
 			}
-			printf("crc %u\n", buf[sz - 1ull]);
+			printf("crc %u, %u\n", buf[sz - 1ull], buf[sz - 2ull]);
 			// std::cout << "crc: " << static_cast<int>(_buf[sz - 1ull]) << '\n';
 		}
 	};
-
 }
