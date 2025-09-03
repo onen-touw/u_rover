@@ -83,64 +83,6 @@ namespace crt
         return ftob.ff;
     }
 
-    // template <typename Ty>
-    // inline Ty get_arg(uint8_t, uint8_t*)
-    // { return Ty(); }
-
-    // template <>
-    // float get_arg(uint8_t _pos, uint8_t *buf)
-    // {
-    //     uint8_t it = crt::cfg::it_data + sizeof(float) * _pos;
-    //     if (it > buf[crt::cfg::it_sz])
-    //     {
-    //         printf("ga_er\n");
-    //         return 0.0f;
-    //     }
-    //     uint8_t ty = (buf[crt::cfg::it_ty] >> (_pos << 1)) & 0b11;
-    //     if (ty != crt::cfg::arg_t::f32)
-    //     {
-    //         printf("ga_er\n");
-    //         return 0.f;
-    //     }
-    //     buf[crt::cfg::it_ty] ^= crt::cfg::arg_t::i << (_pos << 1);
-
-    //     int ii = 0;
-    //     for (uint16_t i = 0; i < 4; ++i)
-    //     {
-    //         ii |= (buf[it++] << (8u * i));
-    //     }
-
-    //     float f = crt::btof(ii);
-    //     return f;
-    // }
-
-    // template <>
-    // int32_t get_arg(uint8_t _pos, uint8_t *buf)
-    // {
-    //     uint8_t it = crt::cfg::it_data + sizeof(int32_t) * _pos;
-    //     if (it > buf[crt::cfg::it_sz])
-    //     {
-    //         printf("ga_er\n");
-    //         return 0;
-    //     }
-    //     uint8_t ty = (buf[crt::cfg::it_ty] >> (_pos << 1)) & 0b11;
-    //     if (ty != crt::cfg::arg_t::i)
-    //     {
-    //         printf("ga_er\n");
-    //         return 0;
-    //     }
-
-    //     buf[crt::cfg::it_ty] ^= crt::cfg::arg_t::i << (_pos << 1);
-
-    //     int32_t ii = 0;
-    //     for (uint16_t i = 0; i < 4; ++i)
-    //     {
-    //         ii |= (buf[it++] << (8u * i));
-    //     }
-
-    //     return ii;
-    // }
-
     template <arg_ind ind, typename Ty, std::enable_if_t<std::is_integral_v<Ty> && sizeof(Ty) <= 4ul && ind < cfg::max_args, bool> = true>
     Ty gget_arg(uint8_t *buf)
     {

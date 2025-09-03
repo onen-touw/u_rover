@@ -41,51 +41,6 @@ namespace app
 			app_data_t &appd = app_data_t::get_instanse();
 			sys_data_t& msys = sys_data_t::get_instanse();
 
-			// net_t nett;
-			// nett.mk_sock(
-			// 	net_descriptors_t::sock_main,
-			// 	"192.168.0.64",
-			// 	net::uSocketType_t::client,
-			// 	[](net::fast_sock::rcv_t *rcv)
-			// 	{
-			// 		// Trace_t::flog("rcv[%u] (%u): %s\n", ufo::utl::get_time_millis(), rcv->_len, rcv->_payload);
-			// 		crt::decrypte_t::unpack(
-			// 			reinterpret_cast<uint8_t *>(rcv->_payload),
-			// 			rcv->_len,
-			// 			[](cmd_t cmd, uint8_t *buf)
-			// 			{
-			// 				app_data_t &appd = app_data_t::get_instanse();
-			// 				if (cmd == cmd_t::remote_trpy)
-			// 				{
-			// 					ufo::lock_guard<mutex_t> _l(appd._remote._lock);
-			// 					appd._remote._throt = crt::get_arg<float>(0, buf);
-			// 					appd._remote._roll = crt::get_arg<float>(1, buf);
-			// 					appd._remote._pitch = crt::get_arg<float>(2, buf);
-			// 					appd._remote._yaw = crt::get_arg<float>(3, buf);
-			// 					appd._remote._mcmd = app::types::mot_cmd_t::mot_vals;
-			// 				}
-			// 				else if (cmd == cmd_t::remote_arm)
-			// 				{
-			// 					ufo::lock_guard<mutex_t> _l(appd._remote._lock);
-			// 					if (crt::get_arg<int32_t>(0, buf) > 0)
-			// 					{
-			// 						appd._remote._mcmd = app::types::mot_cmd_t::mot_set_arm;
-			// 					}
-			// 					else
-			// 					{
-			// 						appd._remote._mcmd = app::types::mot_cmd_t::mot_set_disarm;
-			// 					}
-			// 				}
-			// 			});
-			// 	});
-			// net_t::msg_block_t msg_block = nett.get_block(net_descriptors_t::sock_main);
-			// ufo::thread_cfg cfg_net;
-			// cfg_net._name = "net";
-			// cfg_net._core = 0;
-			// cfg_net._prio = 5;
-			// cfg_net._stackSize = 4096;
-			// ufo::thread_guard task_net(ufo::thread(cfg_net, &net_t::task, &nett));
-
 			//======================== sensors-init ========================
 			#pragma region // sensors
 			#ifdef use_sens
@@ -107,37 +62,18 @@ namespace app
 			#endif
 			#pragma endregion
 
-			// lora llora(msys._drv._uart1.get());
-			// UFO_LoraSettings conf = {};
-			// conf._selfAddr._addh = 0;
-			// conf._selfAddr._addl = 2;
-			// conf._selfAddr._chan = 8;
-			
-			// conf._targAddr._addh = UFO_LORA_BROADCAST;
-			// conf._targAddr._addl = UFO_LORA_BROADCAST;
-			// conf._targAddr._chan = 10;
-			// conf.adrt =  LORA_AIR_DATA_RATE_110_384;
-			// llora.SetConfig(conf, [](lora::rcv_t* cll){
-			// 	printf("rcv on RC from ROVER: %s\n", cll->_payload);
-			// });
-			// llora.Setup();
-			// lora::msg_block_t lora_msg = llora.get_block();
-
-			// ufo::thread_cfg cfg_lora;
-			// cfg_lora._name = "lora";
-			// cfg_lora._core = 1;
-			// cfg_lora._prio = 5;
-			// cfg_lora._stackSize = 4096;
-			// ufo::thread_guard task_lora(ufo::thread(cfg_lora, [](lora* lr, token_t token){
-			// 	while (token)
-			// 	{
-			// 		lr->Iteration();
-			// 	}
-			// }, &llora));
-
 			nettt_t nettt;
 			nettt_t::desc_t sock = 0;
 			// nettt_t::desc_t lrr = 0;
+
+			// nettt_t::msg_block_t lora_msg = nettt.mk(
+			// 	lrr,	
+			// 	std::make_unique<nettt_t::lora_t>(
+			// 		msys._drv._uart1.get(), 
+			// 		lora_test_callback)
+			// 	);
+
+
 			nettt_t::msg_block_t sock_msg = nettt.mk(
 				sock,	
 				std::make_unique<nettt_t::sock_t>(
@@ -160,6 +96,8 @@ namespace app
 
 			while (token)
             {
+				// lora_msg->fMsg(3, "rov: %lu", utl::get_time_millis());
+
 				if (encripter.size())
 				{
 					sock_msg->Msg(encripter.get(), encripter.size());
@@ -409,6 +347,10 @@ namespace app
 							}
 						});
 			
+		}
+
+		static void lora_test_callback(ufo::net::fsk_base::rcv_t *rcv){
+			ufo::Trace_t::flog("rcv[%u] (%u): %s\n", ufo::utl::get_time_millis(), rcv->_len, rcv->_payload);
 		}
 
 		void cns_init(ufo::cns::console_t & cns){

@@ -73,7 +73,7 @@ namespace app
 
                 app_cmd_queue_t()
                 {
-                    _q = xQueueCreate(2, sizeof(cmd_t));
+                    _q = xQueueCreate(5, sizeof(cmd_t));
                     if (!_q)
                     {
                         //
@@ -125,27 +125,8 @@ namespace app
             {
                 // ufo::mutex_t _lock;
                 event_base_t<app_event_e> _app = {};
-                event_base_t<app_event_control_e> _control = {};
+                // event_base_t<app_event_control_e> _control = {};
                 event_base_t<app_event_alarm_e> _alarm = {};
-
-                // event_subj_t<app_event_calibrate_e> _subj_calibrate = {};
-            };
-
-            enum class mot_cmd_t
-            {
-                mot_no,
-                mot_set_arm,
-                mot_set_disarm,
-                mot_vals,
-                mot_valscns, // t== 1, r == 2, p == 3, y == 4
-            };
-
-            struct mot_t
-            {
-                uint16_t _m1 = 0;
-                uint16_t _m2 = 0;
-                uint16_t _m3 = 0;
-                uint16_t _m4 = 0;
             };
 
             struct rover_mot_t

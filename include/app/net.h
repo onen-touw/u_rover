@@ -115,67 +115,6 @@ public:
             });
     }
 
-/* 
-    bool mk_sock(net_descriptors_t d, std::unique_ptr<base_t> sock)
-    {
-        if (!_net_interfaces.empty())
-        {
-            for (iter_t it = _net_interfaces.begin(); it; ++it)
-            {
-                if (it->first == d)
-                {
-                    return false;
-                }
-            }
-        }
-        _net_interfaces.emplace_back(d, std::move(sock));
-        
-        return true;
-    }
-
-    void rm_sock(net_descriptors_t d){
-        _net_interfaces.pop_if(d, [](const s_pair_t& obj, const net_descriptors_t& dd){
-            if (obj.first == dd)
-            {
-                return true;
-            }
-            return false;
-        });
-    }
-
-    // if not found return empty shared_ptr
-    msg_block_t get_block(net_descriptors_t d) {
-
-        if (!_net_interfaces.empty())
-        {
-            for (iter_t it = _net_interfaces.begin(); it; ++it)
-            {
-                if (it->first == d)
-                {
-                    return it->second->get_block();
-                }
-            }
-        }
-        return msg_block_t();
-    }
-
-    void task(ufo::token_t token){
-
-        while (token)
-        {
-            if (!_net_interfaces.empty())
-            {
-                for (iter_t it = _net_interfaces.begin(); it; ++it)
-                {
-				    // printf("net::task-%d\n", __LINE__);
-                    it->second->snd();
-                    it->second->rcv();
-                }
-            }
-            ufo::utl::sleep_for(5);
-        }
-    }
- */
 private:
     static void task(std::unique_ptr<base_t> ptr, ufo::token_t token)
     {

@@ -247,14 +247,16 @@ namespace ufo
             {
                 msg_t msg;
                 msg.identifier = fp_cfg::cmd_set_vals | (0xff << 16);
+                msg.extd = 1;
+                msg.data_length_code = 8;
+                
                 Trace_t::log("cmd-limit: ");
                 printf("0x%lx\n", msg.identifier);
 
                 uint16_t amp = maxCurr * 10;
                 uint16_t volt = destVolt * 100;
                 uint16_t vovp = ovp * 100;
-                msg.extd = 1;
-                msg.data_length_code = 8;
+                
                 msg.data[0] = amp & 255;
                 msg.data[1] = (amp >> 8) & 255;
                 msg.data[2] = volt & 255;
