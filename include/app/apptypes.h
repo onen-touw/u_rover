@@ -3,6 +3,7 @@
 #include "u_sys/config.h"
 #include "u_sys/mutex.h"
 #include "u_sys/btflg.h"
+#include "u_math/u_math.h"
 
 namespace app
 {
@@ -129,39 +130,163 @@ namespace app
                 event_base_t<app_event_alarm_e> _alarm = {};
             };
 
-            struct rover_mot_t
-            {
-                float _rr = 0.f;
-                float _ll = 0.f;
-
-                uint16_t _rpwm =0;
-                uint16_t _lpwm =0;
+            struct eu_angle_t {
+                float _r = 0.f;
+                float _p = 0.f;
+                float _y = 0.f; 
             };
 
-            struct control_sig_t
+            
+            struct rover_mot_t
             {
-                int16_t _throt = 0.f;
-                int16_t _roll = 0.f;
-                int16_t _pitch = 0.f;
-                int16_t _yaw = 0.f;
-                ufo::mutex_t _lock;
+                struct data_t
+                {
+                    struct pwm_t
+                    {
+                        uint16_t _rpwm = 0;
+                        uint16_t _lpwm = 0;
+                    };
+
+                    struct sig_t
+                    {
+                        float _rr = 0.f;
+                        float _ll = 0.f;
+                    };
+                    pwm_t _pwm = {};
+                    sig_t _sig = {};
+                };
+                
+                mutable ufo::mutex_t _lock;
+                data_t _data = {};
+
+                data_t get_data() const {
+                    ufo::lock_guard<ufo::mutex_t>lock(_lock);
+                    data_t d = _data;
+                    return d;
+                }
+                
+            };
+
+            struct control_sig_drone_t
+            {
+                struct data_t
+                {
+                    int16_t _throt = 0.f;
+                    eu_angle_t _ang_sig = {};
+                };
+
+                mutable ufo::mutex_t _lock;
+                data_t _data = {};
+
+                data_t get_data() const {
+                    ufo::lock_guard<ufo::mutex_t>lock(_lock);
+                    data_t d = _data;
+                    return d;
+                }
+            };
+
+
+            struct control_sig_rover_t
+            {
+                struct throt_ctrl_t {
+                    float _l = 0.f;
+                    float _r = 0.f;
+                };
+                struct angle_ctrl_t {
+                    float _throt = 0.f;
+                    float _angle = 0.f;
+                };
+                
+                enum class mode_t {
+                    none,
+                    angle,
+                    throt,
+                };
+
+                struct data_t
+                {
+                    mode_t _mode = mode_t::none;
+                    throt_ctrl_t _throt = {};
+                    angle_ctrl_t _angle = {};
+                };
+
+                mutable ufo::mutex_t _lock;
+                data_t _data = {};
+
+                data_t get_data() const {
+                    ufo::lock_guard<ufo::mutex_t>lock(_lock);
+                    data_t d = _data;
+                    return d;
+                }
             };
 
             struct imu_data_t
             {
-                // add calibration
-                float _r = 0.f;
-                float _p = 0.f;
-                float _y = 0.f;
-                ufo::mutex_t _lock;
+                struct calibration_t
+                {
+                    Vector3<float> _gyro = {};
+                    Vector3<float> _acs = {};
+                };
+
+                struct raw_t{
+                    Vector3<float> _gyro = {};
+                    Vector3<float> _acs = {};
+                };
+
+                struct data_t {
+                    raw_t _raw = {};
+                    eu_angle_t _ang = {};
+                };
+                
+                mutable ufo::mutex_t _lock;
+                data_t _data = {};
+                calibration_t _calib = {};
+
+                data_t get_data() const {
+                    ufo::lock_guard<ufo::mutex_t>lock(_lock);
+                    data_t d = _data;
+                    return d;
+                }
+
+                calibration_t get_calibration() const {
+                    ufo::lock_guard<ufo::mutex_t>lock(_lock);
+                    calibration_t c = _calib;
+                    return c;
+                }
             };
 
             struct bar_data_t
             {
-                // add calibration
-                float _p = 0.f;
-                float _t = 0.f;
-                ufo::mutex_t _lock;
+
+                struct calibration_t
+                {
+                    float _t = 0.f;
+                    float _p = 0.f;
+                };
+
+                struct data_t 
+                {
+                    float _p = 0.f;
+                    float _t = 0.f;
+                };
+
+                mutable ufo::mutex_t _lock;
+                data_t _data = {};
+                calibration_t _calib = {};
+
+
+                data_t get_data() const {
+                    ufo::lock_guard<ufo::mutex_t>lock(_lock);
+                    data_t d = _data;
+                    return d;
+                }
+
+                calibration_t get_calibration() const
+                {
+                    ufo::lock_guard<ufo::mutex_t> lock(_lock);
+                    calibration_t c = _calib;
+                    return c;
+                }
             };
         } // namespace types
 } // namespace app

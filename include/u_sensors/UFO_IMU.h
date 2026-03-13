@@ -94,14 +94,13 @@ enum class UFO_IMU_GyroRange : uint8_t
     IMU_GYRO_DEFAULT_DPS = IMU_GYRO_DEFAULT_2000_DPS
 };
 
-struct UFO_IMU_CalibrationData
+struct IMU_Calibration_t
 {
-    bool valid = false;
     Vector3<float> _accelOffset = {0.f,0.f,0.f};
     Vector3<float> _gyroOffset = {0.f,0.f,0.f};
 };
 
-struct UFO_IMU_Data {
+struct IMU_Data_t {
     Vector3<float> _accel = {0.f,0.f,0.f};
     Vector3<float> _gyro = {0.f,0.f,0.f};
     #if UFO_IMU_ENABLE_TEMRETURE_MODULE
@@ -116,8 +115,8 @@ private:
     float
         _accelRange = 16.0f / 32768.0f,    // ares value for full range (16g) readings
         _gyroRange = 2000.0f / 32768.0f;		
-    UFO_IMU_CalibrationData _calibration;
-    UFO_IMU_Data _data;
+    IMU_Calibration_t _calibration;
+    IMU_Data_t _data;
     #if UFO_IMU_CASTOM_POSITION
     UFO_SensorPosition _position = UFO_SensorPosition::IMU_DIR_BASIC;
     #endif
@@ -207,8 +206,13 @@ public:
 
     }
 
-    void SetOffsets(UFO_IMU_CalibrationData& calibration){
+    void SetOffsets(IMU_Calibration_t& calibration){
         _calibration = calibration;
+    }
+
+    void SetOffsets(Vector3<float>acs, Vector3<float>gyro){
+        _calibration._accelOffset = acs;
+        _calibration._gyroOffset = gyro;
     }
 
     void SetAccelRange(UFO_IMU_AccelRange range)
@@ -245,7 +249,7 @@ public:
         return;
 #else
 
-    uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
+    uint8_t data[12]={}; // data array to hold accelerometer and gyro x, y, z, data
 	uint16_t ii, packet_count, fifo_count;
 	int32_t gyro_bias[3] = { 0, 0, 0 }, accel_bias[3] = { 0, 0, 0 };
 
@@ -375,11 +379,11 @@ public:
         InitSensor();
     }
 
-    const UFO_IMU_CalibrationData& GetOffsets() const {
+    const IMU_Calibration_t& GetOffsets() const {
         return _calibration;
     }
 
-    const UFO_IMU_Data& Get() const {
+    const IMU_Data_t& Get() const {
         return _data;
     }
 

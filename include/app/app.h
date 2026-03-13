@@ -20,6 +20,10 @@
 #include "appdata.h"
 #include "u_dev/lora/UFO_Lora.h"
 #include "u_dev/bazz.h"
+#include "model_uart_ctrl.h"
+
+#include "appconsole.h"
+
 namespace app
 {
     class app_t
@@ -36,95 +40,49 @@ namespace app
 
         void task(ufo::token_t token){
             using namespace ufo;
-			Trace_t::log("app task start\n");
-
-			app_data_t &appd = app_data_t::get_instanse();
-			sys_data_t& msys = sys_data_t::get_instanse();
-
-			//======================== sensors-init ========================
-			#pragma region // sensors
-			#ifdef use_sens
-			sens_t sens(&driver, msg_block);
-
-			ufo::thread_cfg cfg_imu;
-			cfg_imu._name = "imu";
-			cfg_imu._core = 0;
-			cfg_imu._prio = 5;
-			cfg_imu._stackSize = 4096;
-			ufo::thread_guard task_imu(ufo::thread(cfg_imu, &sens_t::task_imu, &sens));
-
-			// ufo::thread_cfg cfg_bar;
-			// cfg_bar._name = "bar";
-			// cfg_bar._core = 0;
-			// cfg_bar._prio = 5;
-			// cfg_bar._stackSize = 4096;
-			// ufo::thread_guard task_bar(ufo::thread(cfg_bar , &sens_t::task_bar, &sens));
-			#endif
-			#pragma endregion
-
-			nettt_t nettt;
-			nettt_t::desc_t sock = 0;
-			// nettt_t::desc_t lrr = 0;
-
-			// nettt_t::msg_block_t lora_msg = nettt.mk(
-			// 	lrr,	
-			// 	std::make_unique<nettt_t::lora_t>(
-			// 		msys._drv._uart1.get(), 
-			// 		lora_test_callback)
-			// 	);
-
-
-			nettt_t::msg_block_t sock_msg = nettt.mk(
-				sock,	
-				std::make_unique<nettt_t::sock_t>(
-					"192.168.0.64", 
-					nettt_t::sock_t::sockt_t::server, 
-					net_callback)
-				);
 
 			bazz_t bz;
-				
 			mpwm_t motors;
 			crt::encrypte_t<remote_cmd_e> encripter;
-			app::types::event_t event = {};
+			model::model_uart_ctrl_t ctrl(__global_system_data._drv._uart1.get(), net_callback);
 
+			app::types::event_t event = {};
 			event._app.set(app_event_e::idle);
-			msys._cns.unlock();
+
+			__global_system_data._cns.unlock();
 
 			using qcmd_t = types::app_cmd_queue_t::cmd_t; 
 			qcmd_t cmd = qcmd_t::null;
 
 			while (token)
             {
-				// lora_msg->fMsg(3, "rov: %lu", utl::get_time_millis());
-
 				if (encripter.size())
 				{
-					sock_msg->Msg(encripter.get(), encripter.size());
+					ctrl.write(encripter.get(), encripter.size())
 					encripter.reset();
 				}
-				// lora_msg->Msg(3, "cntRV:228\n",11);
-				// sock_msg->fMsg("hello %lu", ufo::utl::get_time_millis());
+				
 				if (event._app == app_event_e::control)
 				{		
 					{
-						ufo::lock_guard<mutex_t> _l(appd._control_sig._lock);
+						ufo::lock_guard<mutex_t> _l(__global_app_data._control_sig._lock);
 
-						motors.update(
-							utl::map(static_cast<float>(appd._control_sig._pitch), -1024.f, 1024.f, -1.f, 1.f),
-							utl::map(static_cast<float>(appd._control_sig._roll), -1024.f, 1024.f, -1.f, 1.f)
-						);
-						appd._rover._rr = motors.get_mot_throt_r();
-						appd._rover._ll = motors.get_mot_throt_l();
+						// motors.update(
+						// 	utl::map(static_cast<float>(__global_app_data._control_sig._data._ang_sig._p), -1024.f, 1024.f, -1.f, 1.f),
+						// 	utl::map(static_cast<float>(__global_app_data._control_sig._data._ang_sig._r), -1024.f, 1024.f, -1.f, 1.f)
+						// );
+						
+						__global_app_data._rover._data._sig._rr = motors.get_mot_throt_r();
+						__global_app_data._rover._data._sig._ll = motors.get_mot_throt_l();
 
-						appd._rover._rpwm = motors.get_lpwm();
-						appd._rover._lpwm = motors.get_rpwm();
+						__global_app_data._rover._data._pwm._rpwm = motors.get_lpwm();
+						__global_app_data._rover._data._pwm._lpwm = motors.get_rpwm();
 					}
 
 					ufo::utl::sleep_for(10);
 
 
-					if (xQueueReceive(appd._queue._q, &cmd, 10))
+					if (xQueueReceive(__global_app_data._queue._q, &cmd, 10))
 					{
 						// printf( "\n");
 
@@ -157,7 +115,7 @@ namespace app
 				}
 				else if (event._app == app_event_e::idle)
 				{
-					if (xQueueReceive(appd._queue._q, &cmd, 10))
+					if (xQueueReceive(__global_app_data._queue._q, &cmd, 10))
 					{
 						// printf("\n");
 
@@ -165,7 +123,7 @@ namespace app
 						{
 							printf( "rv::idle::arm\n");
 
-							if (!msys._cns.get_state().get(ufo::types::cns_t::cns_state_t::started))
+							if (!__global_system_data._cns.get_state().get(ufo::types::cns_t::cns_state_t::started))
 							{
 								// todo!!! check in block and if !cns.block() do warning!
 								// msys._cns.block();
@@ -228,7 +186,7 @@ namespace app
 							}
 							bz.update(0);
 
-							if (xQueueReceive(appd._queue._q, &cmd, 50))
+							if (xQueueReceive(__global_app_data._queue._q, &cmd, 50))
 							{
 								if (cmd == qcmd_t::find_off)
 								{
@@ -311,15 +269,14 @@ namespace app
 						{
 							using qcmd_t = types::app_cmd_queue_t::cmd_t; 
 							qcmd_t qcmd = qcmd_t::null;
-							app_data_t &appd = app_data_t::get_instanse();
 
 							if (cmd == remote_cmd_e::trpy)
 							{
-								ufo::lock_guard<mutex_t> _l(appd._control_sig._lock);
-								appd._control_sig._throt = crt::gget_arg<crt::arg_1, uint16_t>(buf);
-								appd._control_sig._roll = crt::gget_arg<crt::arg_2, uint16_t>(buf);
-								appd._control_sig._pitch = crt::gget_arg<crt::arg_3, uint16_t>(buf);
-								appd._control_sig._yaw = crt::gget_arg<crt::arg_4, uint16_t>(buf);
+								ufo::lock_guard<mutex_t> _l(__global_app_data._control_sig._lock);
+								__global_app_data._control_sig._throt = crt::gget_arg<crt::arg_1, uint16_t>(buf);
+								__global_app_data._control_sig._roll = crt::gget_arg<crt::arg_2, uint16_t>(buf);
+								__global_app_data._control_sig._pitch = crt::gget_arg<crt::arg_3, uint16_t>(buf);
+								__global_app_data._control_sig._yaw = crt::gget_arg<crt::arg_4, uint16_t>(buf);
 							}
 							else if (cmd == remote_cmd_e::arm)
 							{
@@ -331,7 +288,7 @@ namespace app
 								{
 									qcmd = qcmd_t::disarm;
 								}
-								xQueueSend(appd._queue._q, &qcmd, 10);
+								xQueueSend(__global_app_data._queue._q, &qcmd, 10);
 							}
 							else if (cmd == remote_cmd_e::find_mode)
 							{
@@ -343,10 +300,9 @@ namespace app
 								{
 									qcmd = qcmd_t::find_off;
 								}
-								xQueueSend(appd._queue._q, &qcmd, 10);
+								xQueueSend(__global_app_data._queue._q, &qcmd, 10);
 							}
 						});
-			
 		}
 
 		static void lora_test_callback(ufo::net::fsk_base::rcv_t *rcv){
@@ -355,290 +311,11 @@ namespace app
 
 		void cns_init(ufo::cns::console_t & cns){
 			using namespace ufo;
+			using namespace app::console;
 
-			cns.mk_blank(
-				"rmt",
-				"",
-				[](cns::console_t::block_t block)
-				{
-					// block->write("rmt was called\n");
-					vector_t<string_t> &arg_list = block->get_buf();
-					if (!arg_list.empty())
-					{
-						if (arg_list.size() > 1)
-						{
-							cns::opt_t opt(arg_list[1]);
-							if (opt == 'e' || opt == "echo")
-							{
-
-								uint16_t d = 50;
-								if (opt.arg_count() == 1)
-								{
-									d = opt.get_arg<uint16_t>(0);
-									if (!d)
-									{
-										d = 50;
-									}
-									block->fwrite("change freq to %ums\n", d);
-								}
-
-								app::app_data_t &_app = app::app_data_t::get_instanse();
-								while (!block->is_read_out_signal())
-								{
-									{
-										ufo::lock_guard<ufo::mutex_t> lock(_app._control_sig._lock);
-										// block->fwrite(">t:%.3f\n>r:%.3f\n>p:%.3f\n>y:%.3f\n\n",
-											block->fwrite(">t:%d\n>r:%d\n>p:%d\n>y:%d\n\n",
-														  _app._control_sig._throt,
-														  _app._control_sig._roll,
-														  _app._control_sig._pitch,
-														  _app._control_sig._yaw);
-									}
-									utl::sleep_for(d);
-								}
-								block->write("echo stop\n");
-								return;
-							}
-						}
-					}
-					block->log_incorrect_arg();
-				});
-
-			cns.mk_blank(
-				"imu",
-				"",
-				[](cns::console_t::block_t block)
-				{
-					block->write("imu was called\n");
-
-					vector_t<string_t> &arg_list = block->get_buf();
-
-					if (!arg_list.empty())
-					{
-						if (arg_list.size() > 1)
-						{
-							cns::opt_t opt(arg_list[1]);
-							if (opt == 'e' || opt == "echo")
-							{
-								uint16_t d = 50;
-								if (opt.arg_count() == 1)
-								{
-									d = opt.get_arg<uint16_t>(0);
-									if (!d)
-									{
-										d = 50;
-									}
-									block->fwrite("change freq to %ums\n", d);
-								}
-
-								app::app_data_t &_app = app::app_data_t::get_instanse();
-								while (!block->is_read_out_signal())
-								{
-									{
-										ufo::lock_guard<ufo::mutex_t> lock(_app._imu._lock);
-										block->fwrite(">r:%.3f\n>p:%.3f\n>y:%.3f\n\n", 
-											_app._imu._r, 
-											_app._imu._p, 
-											_app._imu._y
-										);
-									}
-									utl::sleep_for(d);
-								}
-								block->write("echo stop\n");
-							}
-						}
-					}
-				});
-
-			cns.mk_blank(
-				"bar",
-				"",
-				[](cns::console_t::block_t block)
-				{
-					// block->write("imu was called\n");
-					vector_t<string_t> &arg_list = block->get_buf();
-					if (!arg_list.empty())
-					{
-						if (arg_list.size() > 1)
-						{
-							cns::opt_t opt(arg_list[1]);
-							if (opt == 'e' || opt == "echo")
-							{
-								uint16_t d = 50;
-								if (opt.arg_count() == 1)
-								{
-									d = opt.get_arg<uint16_t>(0);
-									if (!d)
-									{
-										d = 50;
-									}
-									block->fwrite("change freq to %ums\n", d);
-								}
-
-								app::app_data_t &_app = app::app_data_t::get_instanse();
-								while (!block->is_read_out_signal())
-								{
-									{
-										ufo::lock_guard<ufo::mutex_t> lock(_app._baro._lock);
-										block->fwrite(">Pr:%.3f\n>Te:%.3f\n\n", _app._baro._p, _app._baro._t);
-									}
-									utl::sleep_for(d);
-								}
-								block->write("echo stop\n");
-							}
-						}
-					}
-				});
-
-			cns.mk_blank(
-				"mmot",
-				"",
-				[](cns::console_t::block_t block)
-				{
-					vector_t<string_t> &arg_list = block->get_buf();
-					if (!arg_list.empty())
-					{
-						if (arg_list.size() > 1)
-						{
-							cns::opt_t opt(arg_list[1]);
-							if (opt == 'p' || opt == "param")
-							{
-								app::app_data_t &appd = app::app_data_t::get_instanse();
-								// app::types::mot_cmd_t mcmd = app::types::mot_cmd_t::mot_no;
-								// {	// get current command
-								// 	lock_guard<mutex_t> _l(appd._remote._lock);
-								// 	mcmd = appd._remote._mcmd;
-								// }
-								// if (mcmd != app::types::mot_cmd_t::mot_no)
-								// {
-								// 	block->write("prev data was unhandled\n");
-								// 	return;
-								// }
-								if (arg_list.size() > 2)
-								{
-									cns::opt_t mot_opt(arg_list[2]);
-									char m = '\0'; // get char: q/w/s/a or r/p/y
-									float val = 0.f;
-									if (mot_opt == 'q' || mot_opt == "left")
-									{
-										m = 'q';
-									}
-									else if (mot_opt == 'w' || mot_opt == "right")
-									{
-										m = 'w';
-									}
-									else if (mot_opt == 'a' || mot_opt == "all")
-									{
-										m ='a';
-									}
-									else if (mot_opt == 'r' || mot_opt == "rst")
-									{
-										m ='r';
-									}
-									else
-									{
-										block->log_incorrect_arg();
-										return;
-									}
-									if (mot_opt.arg_count() != 1 )
-									{
-										if (m != 'r' && mot_opt.arg_count() != 0)
-										{
-											block->log_incorrect_arg();
-											return;
-										}
-									}
-									val = mot_opt.get_arg<float>(0);
-									if (val < 0.f)
-									{
-										block->log_incorrect_arg();
-										block->write("val<0.f!\n");
-										return;
-									}
-									else if (val > 0.2f)
-									{
-										block->write("val will set to 20% (y/) for continue\n");
-										// while (true)
-										// {
-										// 	string_t sss = block->read();
-										// 	if (sss.size())
-										// 	{
-										// 		if (sss[0] == 'y')
-										// 		{
-										// 			break;
-										// 		}
-										// 		return;
-										// 	}
-										// 	utl::sleep_for(50);
-										// }
-									}
-									val = utl::constrain(static_cast<float>(val), 0.f, 0.3f);
-									lock_guard<mutex_t> _l(appd._control_sig._lock);
-									switch (m)
-									{
-									case 'q':
-									block->fwrite("set-m1 %.3f\n", val);
-										appd._control_sig._roll = val;
-										appd._control_sig._pitch = 0.f;
-										break;
-									case 'w':
-									block->fwrite("set-m2 %.3f\n", val);
-										appd._control_sig._pitch = val;
-										appd._control_sig._roll = 0.f;
-										break;
-									case 'a':
-									block->fwrite("set-all %.3f\n", val);
-										appd._control_sig._pitch = val;
-										appd._control_sig._roll = val;
-										break;
-									default:
-										// clear
-										block->write("reset-all\n");
-										appd._control_sig._throt = 0.f;
-										appd._control_sig._roll = 0.f;
-										appd._control_sig._pitch = 0.f;
-										appd._control_sig._yaw = 0.f;
-										break;
-									}
-									return;
-								}
-							}
-							else if (opt == 'e' || opt == "echo")
-							{
-								uint16_t d = 50;
-								if (opt.arg_count() == 1)
-								{
-									d = opt.get_arg<uint16_t>(0);
-									if (!d)
-									{
-										d = 50;
-									}
-									block->fwrite("change freq to %ums\n", d);
-								}
-								app::app_data_t &_app = app::app_data_t::get_instanse();
-								while (!block->is_read_out_signal())
-								{
-									block->fwrite(">L:%.3f\t>Lp:%d\n>R:%.3f\t>Lr:%d\n\n", 
-										_app._rover._ll, 
-										_app._rover._lpwm, 
-										_app._rover._rr, 
-										_app._rover._rpwm);
-									utl::sleep_for(d);
-								}
-								block->write("echo stop\n");
-								return;
-							}
-							else if (opt == 'h' || opt == "help")
-							{
-								block->write("-p/--param ");
-								block->write("-q/--left=0.1 or -w/--right=0.1 ");
-								block->write("will set 10'%' of thror to left or right motor resp\n");
-								return;
-							}	
-						}
-					}
-					block->log_incorrect_arg();
-				});
+			cns.mk_blank("echo", "write 'echo --<module>=f' where f(optioinal arg) is frequency", console_echo);
+			cns.mk_blank("motors", "two modes of conrol are available: angle and throt", console_motors);
+			cns.mk_blank("imu", "imu module control", console_imu);
 		}
 	};
 

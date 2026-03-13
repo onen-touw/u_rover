@@ -11,22 +11,18 @@
 
 #include "u_math/Madgwick.h"
 #include "u_math/UFO_KalmanFilter.h"
-#include "u_sys/fsk.h"
-#include "u_sys/udat.h"
+#include "appdata.h"
 
 #define to_angle 180.f / ufo_M_PI
 
 // sensor control class
 class sens_t
 {
-    using slist_t = ufo::list_t<ufo::thread_guard>;
 private:
-    slist_t _list;
     ufo::drv::UFO_I2C_Driver* _driver = nullptr;
-    net_t::msg_block_t _msg;
 public:
 
-    sens_t(ufo::drv::UFO_I2C_Driver* drv, net_t::msg_block_t msg) : _msg(msg){
+    sens_t(ufo::drv::UFO_I2C_Driver* drv) {
         if (drv->Initialized())
         {
             _driver = drv;
@@ -50,27 +46,26 @@ public:
 // private:
 public:
 
-    void task_bar(ufo::token_t token) {
-        UFO_Baro baro(_driver);
-        baro.InitSensor();
-        UFO_BaroData_t data = {};
-        ufo::udt::app_data_t& app = ufo::udt::app_data_t::get_instanse();
+    // void task_bar(ufo::token_t token) {
+    //     UFO_Baro baro(_driver);
+    //     baro.InitSensor();
+    //     UFO_BaroData_t data = {};
 
-        while (token)
-        {
-            baro.Update();
-            data = baro.Get();
-            // _msg->fMsg("vzik_bar@%d=%.3f;%.3f\n", ufo::utl::get_time_millis(), data.Presure, data.Tempreture);
-            // ufo::Trace_t::flog("baro: %.3f,%.3f,\n", data.Presure, data.Tempreture);
-            // ufo::Trace_t::flog(">b:%.3f, T:%.3f\n", data.Presure, data.Tempreture);
-            {
-                app._baro._p = data.Presure;
-                app._baro._t = data.Tempreture;
-            }
-            ufo::utl::sleep_for(50);
-        }
-    }
-
+    //     while (token)
+    //     {
+    //         baro.Update();
+    //         data = baro.Get();
+    //         // _msg->fMsg("vzik_bar@%d=%.3f;%.3f\n", ufo::utl::get_time_millis(), data.Presure, data.Tempreture);
+    //         // ufo::Trace_t::flog("baro: %.3f,%.3f,\n", data.Presure, data.Tempreture);
+    //         // ufo::Trace_t::flog(">b:%.3f, T:%.3f\n", data.Presure, data.Tempreture);
+    //         {
+    //             __global_app_data._baro._p = data.Presure;
+    //             __global_app_data._baro._t = data.Tempreture;
+    //         }
+    //         ufo::utl::sleep_for(50);
+    //     }
+    // }
+    
     void task_imu(ufo::token_t token) {
         
 
@@ -81,41 +76,44 @@ public:
             kalmanPitch;
         Madgwick madgwick;
         
-        UFO_IMU_Data data;
+        IMU_Data_t data;
 
         imu.InitSensor();
+        
+        {
+            ufo::lock_guard<ufo::mutex_t> _lock(app::__global_app_data._imu._lock);
+            imu.SetOffsets(app::__global_app_data._imu._calib._acs, app::__global_app_data._imu._calib._gyro);
+        }
         
         madgwick.begin(0.2f);
 
         kalmanRoll.Set(0.5f, 0.5f, 0.8f);
         kalmanPitch.Set(0.5f, 0.5f, 0.8f);
 
-        ufo::Trace_t::log("Keep IMU level...");
-        {
-            UFO_IMU_CalibrationData calib;
-            ufo::utl::sleep_for(2000);
-            imu.Calibrate();
+        // ufo::Trace_t::log("Keep IMU level...");
+        // {
+        //     IMU_Calibration_t calib;
+        //     ufo::utl::sleep_for(2000);
+        //     imu.Calibrate();
 
-            calib = imu.GetOffsets();
-            ufo::Trace_t::log("Calibration done!\n");
-            ufo::Trace_t::log("Accel biases X/Y/Z:\n");
-            ufo::Trace_t::log(calib._accelOffset._x);
-            ufo::Trace_t::log(", ");
-            ufo::Trace_t::log(calib._accelOffset._y);
-            ufo::Trace_t::log(", ");
-            ufo::Trace_t::log(calib._accelOffset._z);
-            ufo::Trace_t::log('\n');
-            ufo::Trace_t::log("Gyro biases X/Y/Z:\n");
-            ufo::Trace_t::log(calib._gyroOffset._x);
-            ufo::Trace_t::log(", ");
-            ufo::Trace_t::log(calib._accelOffset._y);
-            ufo::Trace_t::log(", ");
-            ufo::Trace_t::log(calib._accelOffset._z);
-            ufo::Trace_t::log('\n');
-            ufo::utl::sleep_for(100);
-        }
-
-        ufo::udt::app_data_t& app = ufo::udt::app_data_t::get_instanse();
+        //     calib = imu.GetOffsets();
+        //     ufo::Trace_t::log("Calibration done!\n");
+        //     ufo::Trace_t::log("Accel biases X/Y/Z:\n");
+        //     ufo::Trace_t::log(calib._accelOffset._x);
+        //     ufo::Trace_t::log(", ");
+        //     ufo::Trace_t::log(calib._accelOffset._y);
+        //     ufo::Trace_t::log(", ");
+        //     ufo::Trace_t::log(calib._accelOffset._z);
+        //     ufo::Trace_t::log('\n');
+        //     ufo::Trace_t::log("Gyro biases X/Y/Z:\n");
+        //     ufo::Trace_t::log(calib._gyroOffset._x);
+        //     ufo::Trace_t::log(", ");
+        //     ufo::Trace_t::log(calib._accelOffset._y);
+        //     ufo::Trace_t::log(", ");
+        //     ufo::Trace_t::log(calib._accelOffset._z);
+        //     ufo::Trace_t::log('\n');
+        //     ufo::utl::sleep_for(100);
+        // }
 
         
         while (token)
@@ -158,9 +156,9 @@ public:
             pitch = pitch * 180.f / ufo_M_PI;
             yaw = yaw * 180.f / ufo_M_PI;
             {
-                app._imu._r = roll;
-                app._imu._p = pitch;
-                app._imu._y = yaw;
+                // __global_app_data._imu._r = roll;
+                // __global_app_data._imu._p = pitch;
+                // __global_app_data._imu._y = yaw;
             }
             // _msg->fMsg("vzik_imu@%d=%.3f;%.3f;%.3f\n", ufo::utl::get_time_millis(), roll, pitch, yaw);
             ufo::utl::sleep_for(1);
@@ -168,3 +166,53 @@ public:
         
     }
 };
+
+void task_imu_calibrate(ufo::drv::UFO_I2C_Driver *drv, uint16_t iterations, ufo::token_t token)
+{
+    if (!drv)
+    {
+        return;
+    }
+    
+    if (!drv->Initialized())
+    {
+        return;
+    }
+
+    if (iterations > 10)
+    {
+        return;
+    }
+    UFO_IMU imu(drv);
+    imu.InitSensor();
+    
+    IMU_Calibration_t result = {};
+
+    for (size_t i = 0; i < iterations; i++)
+    {
+        imu.Calibrate();
+        IMU_Calibration_t calib = imu.GetOffsets();
+
+        result._accelOffset._x += calib._accelOffset._x;
+        result._accelOffset._y += calib._accelOffset._y;
+        result._accelOffset._z += calib._accelOffset._z;
+        
+        result._gyroOffset._x += calib._gyroOffset._x;
+        result._gyroOffset._y += calib._gyroOffset._y;
+        result._gyroOffset._z += calib._gyroOffset._z;
+        ufo::utl::sleep_for(10);
+    }
+    
+    result._accelOffset._x /= iterations;
+    result._accelOffset._y /= iterations;
+    result._accelOffset._z /= iterations;
+
+    result._gyroOffset._x /= iterations;
+    result._gyroOffset._y /= iterations;
+    result._gyroOffset._z /= iterations;
+    
+
+    ufo::lock_guard<ufo::mutex_t> _lock (app::__global_app_data._imu._lock);
+    app::__global_app_data._imu._calib._acs = result._accelOffset;
+    app::__global_app_data._imu._calib._gyro = result._gyroOffset;
+}

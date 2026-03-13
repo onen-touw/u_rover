@@ -7,10 +7,10 @@ namespace app
         class app_data_t
         {
         public:
-            types::control_sig_t _control_sig = {};
+            types::control_sig_rover_t _control_sig = {};
             types::bar_data_t _baro = {};
             types::imu_data_t _imu = {};
-            // types::mot_t _mot = {};
+
             types::rover_mot_t _rover = {};
 
             types::event_t _event = {};
@@ -32,4 +32,7 @@ namespace app
             app_data_t &operator=(app_data_t &&) = default;
             app_data_t(app_data_t &&) = default;
         };
+
+        static app_data_t& __global_app_data = app_data_t::get_instanse();
+        
 } // namespace app
